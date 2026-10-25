@@ -1,0 +1,15 @@
+{
+  "type": "music",
+  "domain": "amazon_music",
+  "name": "Amazon Music",
+  "description": "Experimental Amazon Music provider scaffold for Music Assistant development.",
+  "codeowners": ["@SorelMathis"],
+  "documentation": "https://github.com/SorelMathis/amazon-music-ma-provider",
+  "requirements": [
+    "aiohttp>=3.9.0",
+    "keyring>=24.0.0"
+  ],
+  "icon": "mdi-amazon",
+  "is_built_in": false,
+  "has_setup_flow": true
+}
