@@ -26,6 +26,8 @@ class ProviderSettings:
     enable_mock_mode: bool = True
     stream_timeout_seconds: int = 30
     auth_file: str | None = None
+    allowed_stream_hosts: tuple[str, ...] = ()
+    real_mode: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -34,6 +36,8 @@ class ProviderSettings:
             "enable_mock_mode": self.enable_mock_mode,
             "stream_timeout_seconds": self.stream_timeout_seconds,
             "auth_file": self.auth_file,
+            "allowed_stream_hosts": list(self.allowed_stream_hosts),
+            "real_mode": self.real_mode,
         }
 
 
@@ -49,12 +53,22 @@ def get_secure_storage_file() -> Path:
     return storage / "session.json"
 
 
+def _ensure_file_permissions(path: Path) -> None:
+    """Apply restrictive permissions when the OS supports it."""
+    if os.name == "nt":
+        return
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
 def _write_protected_json(path: Path, payload: dict[str, Any]) -> None:
     """Write JSON to a protected file with restrictive permissions."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
-    os.chmod(path, 0o600)
+    _ensure_file_permissions(path)
 
 
 class SecureSecretStore:
@@ -87,11 +101,15 @@ class SecureSecretStore:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return None
-        return payload.get(name)
+        value = payload.get(name)
+        return value if isinstance(value, str) else None
 
     def delete_secret(self, name: str) -> None:
         if keyring is not None:
-            keyring.delete_password(self.service_name, name)
+            try:
+                keyring.delete_password(self.service_name, name)
+            except keyring.errors.PasswordDeleteError:
+                pass
             return
         path = get_secure_storage_file()
         if not path.exists():
@@ -116,12 +134,22 @@ def load_settings(path: str | Path | None = None) -> ProviderSettings:
     target = Path(path) if path is not None else get_secure_storage_file().with_name("settings.json")
     if not target.exists():
         return ProviderSettings()
-    with target.open("r", encoding="utf-8") as handle:
-        raw = json.load(handle)
+    try:
+        with target.open("r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        return ProviderSettings()
+    allowed_hosts_value = raw.get("allowed_stream_hosts", ())
+    if isinstance(allowed_hosts_value, str):
+        allowed_hosts = (allowed_hosts_value,)
+    else:
+        allowed_hosts = tuple(str(item) for item in allowed_hosts_value)
     return ProviderSettings(
         region=str(raw.get("region", "fr")),
         session_ttl_minutes=int(raw.get("session_ttl_minutes", 60)),
         enable_mock_mode=bool(raw.get("enable_mock_mode", True)),
         stream_timeout_seconds=int(raw.get("stream_timeout_seconds", 30)),
         auth_file=raw.get("auth_file"),
+        allowed_stream_hosts=allowed_hosts,
+        real_mode=bool(raw.get("real_mode", False)),
     )

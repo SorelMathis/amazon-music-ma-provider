@@ -3,37 +3,39 @@
 Ce dépôt est un scaffold de développement autonome pour un fournisseur Music Assistant d'Amazon Music, sans modifier l'installation officielle Music Assistant déjà en place.
 
 Ce que ce dépôt n'est pas :
-- ce n'est pas une intégration officielle Amazon Music Unlimited,
-- ce n'est pas un fournisseur validé par Amazon,
-- ce n'est pas une intégration de lecture réelle exploitable dans un conteneur MA sans une API ou un accès autorisé côté Amazon.
+- ce n'est pas un fournisseur Amazon Music Unlimited officiellement supporté par Amazon,
+- ce n'est pas une intégration de lecture réelle prête à l'emploi,
+- ce n'est pas une intégration avec le runtime officiel Music Assistant installé dans ce dépôt.
 
 Ce que ce dépôt est :
-- un squelette technique compatible avec l'architecture de fournisseur Music Assistant,
-- une base de développement isolée hors conteneur MA,
-- une couche de validation des secrets, des sessions et des URL,
-- un point d'entrée pour une intégration réelle à condition de disposer d'un flux Amazon autorisé et stable.
+- un squelette technique autonome pour préparer une intégration Music Assistant,
+- une base de développement isolée hors conteneur Docker MA,
+- une couche de validation de sessions, sécrets et flux de test,
+- un point de départ pour une intégration réelle, sous réserve d'un accès Amazon autorisé, documenté et stable.
 
-Audit technique de conformité
-- Le rôle du package `custom_providers/amazon_music` est de reproduire le schéma de chargement d'un fournisseur Music Assistant : `manifest.json` + `__init__.py` + optionnel `setup_flow.py`.
-- Le `setup()` du module fournisseur doit respecter la signature attendue par Music Assistant : `setup(mass, manifest, config)`.
-- Un fournisseur réel Music Assistant hérite de `MusicProvider` et doit implémenter les méthodes de catalogue/lecture selon les fonctionnalités déclarées. Ce repo ne prétend pas les avoir validées avec la stack MA officielle, car l'API Amazon réelle manque encore.
+Compatibilité technique ciblée
+- Le runtime officiel Music Assistant a un contrat de fournisseur basé sur `MusicProvider` (voir `music_assistant/models/music_provider.py`) et sur le mécanisme de chargement de manifestes dans `music_assistant/mass.py`.
+- Ce dépôt ne prétend pas être chargé automatiquement dans la stack MA existante de l'utilisateur ; il est un package autonome d'atelier technique.
+- Les fichiers `custom_providers/amazon_music/*.py` et `manifest.json` reproduisent le schéma de découverte d'un fournisseur externe : package du fournisseur + manifest + setup flow, sans importer directement le runtime officiel.
+- La validation de compatibilité dans ce dépôt se limite aux imports Python, au contrat local de configuration et aux tests unitaires. Une validation réelle dans le runtime officiel de Music Assistant n'a pas été effectuée ici, car ce dépôt ne contient pas le serveur MA réel.
 
 Sécurité
 - Aucun mot de passe Amazon n'est stocké dans le dépôt.
-- Les tokens ou sessions sont stockés dans un support utilisateur sécurisé, via `keyring` si disponible, sinon dans un fichier local chiffré par convention et protégé (permissions restrictive 600).
-- Les données de démonstration ne sont jamais présentées comme des accès Amazon réels.
+- Les secrets sont gérés via `keyring` si disponible ; sinon dans un fichier local protégé, avec permissions restreintes sur POSIX.
+- Les données de démonstration sont explicitement identifiées comme `mock` et ne sont jamais présentées comme des accès Amazon réels.
 
-URL et flux de streaming
-- Les URL de démonstration ne doivent pas être acceptées comme des flux Amazon réels.
-- Les URL `mock://...` sont explicitement marquées comme des flux de test local uniquement.
-- Les URL `https://...` non contrôlées par Amazon ne sont pas considérées comme valides pour un flux de production.
+Validation des flux et URL
+- Les URL `mock://...` sont acceptées uniquement en mode mock explicite.
+- Les URLs HTTP/HTTPS réelles ne sont acceptées que si une liste de hôtes autorisés est fournie et si le hôte correspond exactement à un hôte autorisé. Aucune URL HTTPS ne doit être acceptée comme preuve de validité Amazon sans cette liste stricte.
+- Une URL de test `https://amazon.example.com/stream` est rejetée, parce qu'elle n'est pas un domaine Amazon autorisé et parce que le domaine n'est pas dans la liste de confiance.
+- Les domaines de type `amazon.com.site-malveillant.example` ou `music.amazon.com.evil.dev` sont rejetés.
 
 État réel du projet
-- Fonctionnel/testé : validation des identifiants, gestion de session expirée, stockage sécurisé, validation de flux mockés, intégration de base du package et tests automatisés.
-- Implémenté, mais non validé contre Amazon : intégration de service réel, authentification Amazon et lecture de flux réels.
+- Validé ici : validation d'URL, session expirée, stockage sécurisé, séparations mock/réel, import du package fournisseur, tests unitaires.
+- Non validé ici : accès réel à Amazon Music Unlimited, authentification Amazon officialisée, catalogue live, lecture audio réelle.
 - Bloqué pour la lecture réelle : accès officiel et autorisé à Amazon Music Unlimited.
 
-Installation isolée du paquet de test
+Environnement de test isolé
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
@@ -42,4 +44,4 @@ python -m pip install -e .
 pytest -q
 ```
 
-Cette commande ne touche pas le conteneur Music Assistant existant.
+Cette procédure n'impacte pas le conteneur Docker Music Assistant déjà en fonctionnement.

@@ -18,6 +18,8 @@ class AmazonMusicProvider:
         self.client = AmazonMusicClient(access_token=None, region=self.settings.region)
 
     async def authenticate(self, username: str, password: str) -> TokenBundle:
+        if self.settings.real_mode:
+            raise AmazonAuthError("real Amazon auth is not implemented in this scaffold")
         try:
             bundle = self.auth.create_mock_session(username, password)
         except AmazonAuthError:
@@ -55,13 +57,19 @@ class AmazonMusicProvider:
         if not self.client.is_configured():
             raise AmazonAuthError("provider is not authenticated")
         stream_url = self.client.build_stream_url(track_id)
+        allowed_hosts = tuple(host.lower() for host in self.settings.allowed_stream_hosts)
+        is_valid = self.client.validate_stream_url(
+            stream_url,
+            allow_mock=self.settings.enable_mock_mode,
+            allowed_hosts=allowed_hosts,
+        )
         return {
             "track_id": track_id,
             "stream_url": stream_url,
             "content_type": "audio/mpeg",
             "allow_seek": True,
             "can_seek": True,
-            "is_valid": self.client.validate_stream_url(stream_url, allow_mock=True),
+            "is_valid": is_valid,
             "source": "mock",
         }
 

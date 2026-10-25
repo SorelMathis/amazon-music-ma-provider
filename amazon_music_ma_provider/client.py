@@ -107,13 +107,42 @@ class AmazonMusicClient:
             raise ValueError("track_id is required")
         return f"mock://amazon-music.local/stream/{track_id}?region={self.region}"
 
-    def validate_stream_url(self, url: str, *, allow_mock: bool = False) -> bool:
-        """Validate a real or mock URL without implying Amazon authorization."""
+    def validate_stream_url(
+        self,
+        url: str,
+        *,
+        allow_mock: bool = False,
+        allowed_hosts: Iterable[str] | None = None,
+    ) -> bool:
+        """Validate a URL without asserting that it is a real Amazon stream.
+
+        This function separates syntactic validation from actual authorization. In real mode,
+        a separate allowlist must be configured and every host must be checked against that list.
+        """
         if not isinstance(url, str) or not url.strip():
             return False
         parsed = urlparse(url)
-        if parsed.scheme in {"http", "https"}:
-            return parsed.netloc and parsed.netloc != "example.invalid"
+        hostname = (parsed.hostname or "").lower()
+        if not hostname:
+            return False
+
         if allow_mock and parsed.scheme == "mock":
-            return bool(parsed.netloc)
-        return False
+            return bool(parsed.netloc) and hostname not in {"example.invalid", "localhost"}
+
+        if parsed.scheme not in {"http", "https"}:
+            return False
+        if parsed.username or parsed.password:
+            return False
+        if hostname in {"localhost", "127.0.0.1", "::1", "example.invalid"}:
+            return False
+        if hostname.endswith(".example") or hostname.endswith(".invalid") or hostname.endswith(".local"):
+            return False
+        if hostname.startswith(".") or hostname.endswith("."):
+            return False
+
+        hosts = tuple(str(item).lower().strip() for item in (allowed_hosts or ()))
+        if not hosts:
+            return False
+        if hostname not in hosts and not any(hostname == host or hostname.endswith(f".{host}") for host in hosts):
+            return False
+        return True

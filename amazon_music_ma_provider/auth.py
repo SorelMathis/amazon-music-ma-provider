@@ -1,7 +1,7 @@
 """Authentication layer for the Amazon Music provider scaffold.
 
-This module intentionally separates mock and live logic. Mock values are clearly tagged as such
-and never presented as production Amazon credentials or stream URLs.
+This module intentionally separates mock-only local validation from any future live Amazon logic.
+The mock data is clearly labeled and must never be treated as a real Amazon session.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from .config import ProviderSettings, SecureSecretStore
 
 
 class AmazonAuthError(RuntimeError):
-    """Raised when the auth layer rejects a login or a stored session."""
+    """Raised when the auth layer rejects a login or an invalid stored session."""
 
 
 @dataclass
@@ -51,6 +51,8 @@ class AmazonMusicAuthenticator:
 
     def create_mock_session(self, username: str, password: str) -> TokenBundle:
         """Create a clearly-labeled mock session for local validation only."""
+        if self.settings.real_mode:
+            raise AmazonAuthError("real Amazon auth is intentionally not implemented in this scaffold")
         self.validate_credentials(username, password)
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=self.settings.session_ttl_minutes)
         return TokenBundle(
@@ -64,6 +66,8 @@ class AmazonMusicAuthenticator:
 
     def save_session(self, bundle: TokenBundle) -> None:
         """Persist the opaque token bundle in protected user storage. No secrets are kept in repo."""
+        if bundle.source != "mock" and self.settings.real_mode:
+            raise AmazonAuthError("live Amazon auth is not implemented in this scaffold")
         self.store.store_secret("access_token", bundle.access_token)
         self.store.store_secret("refresh_token", bundle.refresh_token)
         self.store.store_secret(
@@ -89,12 +93,24 @@ class AmazonMusicAuthenticator:
         try:
             metadata = json.loads(metadata_raw)
         except json.JSONDecodeError:
+            self.clear_session()
             return None
-        expires_at = datetime.fromisoformat(metadata.get("expires_at", datetime.now(timezone.utc).isoformat()))
+        expires_at = metadata.get("expires_at")
+        if not isinstance(expires_at, str):
+            self.clear_session()
+            return None
+        try:
+            expires_at_dt = datetime.fromisoformat(expires_at)
+        except ValueError:
+            self.clear_session()
+            return None
+        if expires_at_dt <= datetime.now(timezone.utc):
+            self.clear_session()
+            return None
         return TokenBundle(
             access_token=access_token,
             refresh_token=refresh_token,
-            expires_at=expires_at,
+            expires_at=expires_at_dt,
             token_type=str(metadata.get("token_type", "Bearer")),
             region=str(metadata.get("region", "fr")),
             source=str(metadata.get("source", "mock")),
