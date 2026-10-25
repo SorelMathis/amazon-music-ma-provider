@@ -1,22 +1,45 @@
-# amazon-music-ma-provider
+# Amazon Music MA Provider
 
-Project de développement autonome pour une intégration Music Assistant d'Amazon Music Unlimited, sans modifier l'installation officielle Music Assistant déjà en place.
+Ce dépôt est un scaffold de développement autonome pour un fournisseur Music Assistant d'Amazon Music, sans modifier l'installation officielle Music Assistant déjà en place.
 
-Ce dépôt ne prétend pas fournir un accès officiel ou fiable à Amazon Music Unlimited. Il contient :
-- un squelette de fournisseur Music Assistant compatible avec l'architecture actuelle,
-- un flux de configuration sécurisé,
-- un client Python asynchrone avec logique de validation et de streaming mockée,
-- des tests automatisés sécurisés,
-- une documentation de mise en œuvre et de dépannage.
+Ce que ce dépôt n'est pas :
+- ce n'est pas une intégration officielle Amazon Music Unlimited,
+- ce n'est pas un fournisseur validé par Amazon,
+- ce n'est pas une intégration de lecture réelle exploitable dans un conteneur MA sans une API ou un accès autorisé côté Amazon.
 
-Principes de sécurité :
-- aucun mot de passe Amazon n'est stocké dans le dépôt,
-- les tokens sont gérés via le stockage sécurisé du système (keyring) ou un fichier local protégé,
-- les appels réels vers Amazon ne sont pas simulés comme réussis.
+Ce que ce dépôt est :
+- un squelette technique compatible avec l'architecture de fournisseur Music Assistant,
+- une base de développement isolée hors conteneur MA,
+- une couche de validation des secrets, des sessions et des URL,
+- un point d'entrée pour une intégration réelle à condition de disposer d'un flux Amazon autorisé et stable.
 
-État réel du projet :
-- Implémenté et testé : authentification locale, validation des réponses, recherche et structure du provider.
-- Implémenté mais non testé avec un vrai compte Amazon : intégration réelle via Amazon API ou session web.
-- Bloqué / non fiable pour un vrai streaming : accès Amazon Music Unlimited réel, car il dépend d'une API officielle ou d'un flux de session validé par Amazon.
+Audit technique de conformité
+- Le rôle du package `custom_providers/amazon_music` est de reproduire le schéma de chargement d'un fournisseur Music Assistant : `manifest.json` + `__init__.py` + optionnel `setup_flow.py`.
+- Le `setup()` du module fournisseur doit respecter la signature attendue par Music Assistant : `setup(mass, manifest, config)`.
+- Un fournisseur réel Music Assistant hérite de `MusicProvider` et doit implémenter les méthodes de catalogue/lecture selon les fonctionnalités déclarées. Ce repo ne prétend pas les avoir validées avec la stack MA officielle, car l'API Amazon réelle manque encore.
 
-Le code ici est destiné à servir de base de développement hors conteneur, sans toucher ni remplacer le conteneur Music Assistant existant.
+Sécurité
+- Aucun mot de passe Amazon n'est stocké dans le dépôt.
+- Les tokens ou sessions sont stockés dans un support utilisateur sécurisé, via `keyring` si disponible, sinon dans un fichier local chiffré par convention et protégé (permissions restrictive 600).
+- Les données de démonstration ne sont jamais présentées comme des accès Amazon réels.
+
+URL et flux de streaming
+- Les URL de démonstration ne doivent pas être acceptées comme des flux Amazon réels.
+- Les URL `mock://...` sont explicitement marquées comme des flux de test local uniquement.
+- Les URL `https://...` non contrôlées par Amazon ne sont pas considérées comme valides pour un flux de production.
+
+État réel du projet
+- Fonctionnel/testé : validation des identifiants, gestion de session expirée, stockage sécurisé, validation de flux mockés, intégration de base du package et tests automatisés.
+- Implémenté, mais non validé contre Amazon : intégration de service réel, authentification Amazon et lecture de flux réels.
+- Bloqué pour la lecture réelle : accès officiel et autorisé à Amazon Music Unlimited.
+
+Installation isolée du paquet de test
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+pytest -q
+```
+
+Cette commande ne touche pas le conteneur Music Assistant existant.

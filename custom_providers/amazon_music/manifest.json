@@ -1,8 +1,8 @@
 {
   "type": "music",
   "domain": "amazon_music",
-  "name": "Amazon Music",
-  "description": "Experimental Amazon Music provider scaffold for Music Assistant development.",
+  "name": "Amazon Music (development scaffold)",
+  "description": "Experimental development scaffold for Amazon Music integration in Music Assistant. This is not an official Amazon provider and requires a real Amazon-authorized backend to become production-ready.",
   "codeowners": ["@SorelMathis"],
   "documentation": "https://github.com/SorelMathis/amazon-music-ma-provider",
   "requirements": [
